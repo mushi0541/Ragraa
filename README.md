@@ -20,7 +20,7 @@ Ragraa is a frontend third-party client for [Flex](https://flexstudent.nu.edu.pk
         
 ## Instructions
 
-Since the app doesn't have access to Flex API, it cannot login without having solved the recaptcha. So you must refresh (which just logs you in again) and solve the captcha that pops up to update your marks/attendance. Also, you have to choose the current semester (only once though, it remembers!) in the login screen.
+Since the app doesn't have access to Flex API, it cannot login without having solved the captcha (Flex uses Cloudflare Turnstile). So you must refresh (which just logs you in again) and complete the Cloudflare check that pops up to update your marks/attendance. Also, you have to choose the current semester (only once though, it remembers!) in the login screen.
 
 
 ## Screenshots

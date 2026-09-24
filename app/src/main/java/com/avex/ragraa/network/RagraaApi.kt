@@ -28,6 +28,10 @@ import androidx.core.content.edit
 
 
 object RagraaApi {
+    // Flex replaced reCAPTCHA with Cloudflare Turnstile; the widget submits its token under this field
+    const val CAPTCHA_FIELD = "cf-turnstile-response"
+    const val TURNSTILE_SITE_KEY = "0x4AAAAAAEq7Jg8LAmT_3ktd"
+
     var sessionID = ""
     var updateStatus: (Pair<String, Int>) -> Unit = {}
 
@@ -39,7 +43,7 @@ object RagraaApi {
         val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
             .addFormDataPart("username", loginRequest.rollNo.ifEmpty { Datasource.rollNo })
             .addFormDataPart("password", loginRequest.password.ifEmpty { Datasource.password })
-            .addFormDataPart("g-recaptcha-response", loginRequest.g_recaptcha_response).build()
+            .addFormDataPart(CAPTCHA_FIELD, loginRequest.g_recaptcha_response).build()
 
         val request = Request.Builder().url(url).post(requestBody).build()
 
@@ -56,15 +60,18 @@ object RagraaApi {
             override fun onResponse(call: Call, response: Response) {
                 val responseString = response.body?.string().toString()
                 if (!responseString.contains("\"status\":\"done\"")) {
-                    if (responseString.contains("\"msg\":\"Incorrect Recaptcha.\""))
+                    if (responseString.contains("captcha", ignoreCase = true))
                         updateStatus(Pair("Error: Invalid captcha.", 0))
                     else
                         updateStatus(Pair("Error: Invalid credentials", 0))
 
                     return
                 }
+                sessionID = parseSessionId(response) ?: run {
+                    updateStatus(Pair("Error: Flex did not return a session", 0))
+                    return
+                }
                 updateStatus(Pair("Logged in successfully", 0))
-                sessionID = response.header("set-cookie").toString().substring(18, 42)
 
                 val sameUser = loginRequest.rollNo == Datasource.rollNo
 
@@ -107,7 +114,11 @@ object RagraaApi {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                if (!response.isSuccessful) {
+                    backgroundCheck?.invoke(false)
+                    updateStatus(Pair("Error: Flex returned ${response.code}", 0))
+                    return
+                }
 
                 marksResponse = response.body?.string().toString()
 
@@ -161,7 +172,10 @@ object RagraaApi {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                if (!response.isSuccessful) {
+                    updateStatus(Pair("Error: Flex returned ${response.code}", 0))
+                    return
+                }
 
                 Datasource.attendanceResponse = response.body?.string().toString()
 
@@ -195,7 +209,10 @@ object RagraaApi {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                if (!response.isSuccessful) {
+                    updateStatus(Pair("Error: Flex returned ${response.code}", 0))
+                    return
+                }
                 updateStatus(Pair("Fetched profile picture successfully", 1))
                 saveImage(response, rollNo)
             }
@@ -225,7 +242,10 @@ object RagraaApi {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (!response.isSuccessful) throw IOException("Unexpected code $response")
+                if (!response.isSuccessful) {
+                    updateStatus(Pair("Error: Flex returned ${response.code}", 0))
+                    return
+                }
 
                 Datasource.transcriptResponse = response.body?.string().toString()
 
@@ -238,6 +258,9 @@ object RagraaApi {
             }
         })
     }
+
+    fun parseSessionId(response: Response): String? = response.headers("set-cookie")
+        .firstNotNullOfOrNull { Regex("ASP\\.NET_SessionId=([^;]+)").find(it)?.groupValues?.get(1) }
 
     private fun createNonPersistentCookie(): Cookie {
         return Cookie.Builder().domain("flexstudent.nu.edu.pk").path("/").name("ASP.NET_SessionId")

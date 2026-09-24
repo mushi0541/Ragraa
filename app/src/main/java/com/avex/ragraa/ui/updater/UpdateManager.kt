@@ -9,7 +9,7 @@ import okhttp3.Response
 import java.util.concurrent.TimeUnit
 
 object UpdateManager {
-    const val CURRENT_VERSION = 1.9
+    const val CURRENT_VERSION = 2.0
     var newVersion = 0f
     var updateURL = ""
 

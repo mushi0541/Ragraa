@@ -51,7 +51,7 @@ import com.avex.ragraa.R
 import com.avex.ragraa.data.Datasource
 import com.avex.ragraa.network.CustomWebChromeClient
 import com.avex.ragraa.network.CustomWebViewClient
-import com.avex.ragraa.network.captchaLoaded
+import com.avex.ragraa.network.RagraaApi
 
 @Composable
 fun LoginScreen(
@@ -185,13 +185,40 @@ fun LoginScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(480.dp)
+                    .height(100.dp)
                     .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (Datasource.darkTheme) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSecondary)
             ) {
+                // Flex now uses Cloudflare Turnstile. Base URL must be the Flex origin so the sitekey's hostname check passes.
+                val captchaSnippet = """
+                    <html>
+                    <head>
+                        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onloadCallback" async defer></script>
+                        <style>
+                            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: flex-start; height: 100vh; background-color: $backgroundHex; }
+                            #captcha { margin-top: 16px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div id="captcha"></div>
+                        <script type="text/javascript">
+                            function onloadCallback() {
+                                turnstile.render("#captcha", {
+                                    sitekey: "${RagraaApi.TURNSTILE_SITE_KEY}",
+                                    theme: "${if (Datasource.darkTheme) "dark" else "light"}",
+                                    callback: function(token) { console.log("koubilgicaptchatoken:" + token) }
+                                })
+                            }
+                        </script>
+                    </body>
+                    </html>
+                """.trimIndent()
+
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
+                    // Load once in factory; loading in the update block reset the widget on every recomposition (e.g. typing)
                     factory = { context ->
                         WebView(context).apply {
                             this.webViewClient = webViewClient
@@ -199,20 +226,15 @@ fun LoginScreen(
                             settings.javaScriptEnabled = true
                             settings.blockNetworkImage = false
                             settings.domStorageEnabled = true
-                            settings.userAgentString =
-                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6778.39 Mobile Safari/537.36"
+                            // Keep the WebView's real user agent: Turnstile fails when it doesn't match the browser fingerprint
                             setBackgroundColor(backgroundColor)
                             // Fix for "white box" on scroll
                             setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                             isNestedScrollingEnabled = false
+                            loadDataWithBaseURL("https://flexstudent.nu.edu.pk/Login", captchaSnippet, "text/html", "UTF-8", null)
                         }
                     }
-                ) { webView ->
-                    val captchaSnippet =
-                        "<html>\n    <head>\n        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n        <script src=\"https://www.google.com/recaptcha/api.js?onload=onloadCallback\"></script>\n        <style>\n            body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: flex-start; height: 100vh; background-color: $backgroundHex; }\n            #captcha { margin-top: 20px; transform: scale(1.1); transform-origin: top center; }\n        </style>\n    </head>\n    <body>\n    <div id=\"captcha\"> </div>\n    </body>\n    <script type=\"text/javascript\">\n        function onloadCallback()\n        {\n            grecaptcha.render(\"captcha\", {\n                \"sitekey\" : \"6LeMxrMZAAAAAJEK1UwUc0C-ScFUyJy07f8YN70S\",\n                \"callback\" : function(response) {\n                    console.log(\"koubilgicaptchatoken:\"+response)\n                }\n            })\n        }\n    </script>\n</html>"
-
-                    webView.loadDataWithBaseURL("https://flexstudent.nu.edu.pk/Login", captchaSnippet, "text/html", "UTF-8", null)
-                }
+                )
             }
         }
 

@@ -2,7 +2,8 @@ package com.avex.ragraa.data
 
 import com.avex.ragraa.sharedPreferences
 import com.twocaptcha.TwoCaptcha
-import com.twocaptcha.captcha.ReCaptcha
+import com.avex.ragraa.network.RagraaApi
+import com.twocaptcha.captcha.Turnstile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,12 +27,9 @@ object CaptchaSolver {
             return Result.failure(Exception("Key is empty"))
 
         return withContext(Dispatchers.IO) {
-            val captcha = ReCaptcha().apply {
-                setSiteKey("6LeMxrMZAAAAAJEK1UwUc0C-ScFUyJy07f8YN70S")
+            val captcha = Turnstile().apply {
+                setSiteKey(RagraaApi.TURNSTILE_SITE_KEY)
                 setUrl("https://flexstudent.nu.edu.pk/Login")
-                setInvisible(true)
-                setAction("verify")
-                setProxy("HTTPS", "login:password@IP_address:PORT")
             }
 
             try {

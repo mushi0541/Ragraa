@@ -117,7 +117,7 @@ class PeriodicWorker(appContext: Context, workerParams: WorkerParameters) :
             val requestBody = MultipartBody.Builder().setType(MultipartBody.FORM)
                 .addFormDataPart("username", loginReq.rollNo)
                 .addFormDataPart("password", loginReq.password)
-                .addFormDataPart("g-recaptcha-response", loginReq.g_recaptcha_response).build()
+                .addFormDataPart(RagraaApi.CAPTCHA_FIELD, loginReq.g_recaptcha_response).build()
 
             val request = Request.Builder().url(url).post(requestBody).build()
 
@@ -132,17 +132,14 @@ class PeriodicWorker(appContext: Context, workerParams: WorkerParameters) :
             val responseBody = response.body?.string() ?: ""
 
             if (!responseBody.contains("\"status\":\"done\"")) {
-                if (responseBody.contains("\"msg\":\"Incorrect Recaptcha.\""))
-                    throw(Error("Invalid recaptcha. Please check the key."))
+                // Exception, not Error, so the catch below reports it instead of crashing the worker
+                if (responseBody.contains("captcha", ignoreCase = true))
+                    throw Exception("Invalid captcha. Please check the key.")
                 else
-                    throw(Error("Invalid credentials."))
+                    throw Exception("Invalid credentials.")
             }
 
-            // Extract session cookie
-            val cookie = response.header("set-cookie").toString()
-            if (cookie.length >= 42) {
-                sessionID = cookie.substring(18, 42)
-            }
+            sessionID = RagraaApi.parseSessionId(response) ?: throw Exception("Flex did not return a session.")
 
             Datasource.marksParsed = false
 

@@ -96,7 +96,8 @@ class LoginViewModel : ViewModel() {
     private fun updateStatus(newStatus: String, index: Int) {
         status[index] = newStatus
 
-        if (status[0].contains("captcha", ignoreCase = true)) {
+        // Turnstile tokens are single-use, so any failed login attempt needs a fresh captcha
+        if (status[0].contains("Error", ignoreCase = true)) {
             captchaToken = ""
             captchaSolved = false
         }
